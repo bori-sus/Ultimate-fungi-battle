@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Тесты / покрытие
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.cache
+coverage.xml
+
+# Виртуальные окружения
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Проект
+save_placeholder.json
+*.save
+*.sav
+
+# Логи
+*.log

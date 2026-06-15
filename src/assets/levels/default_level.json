@@ -1,0 +1,7 @@
+{
+  "name": "Начальный",
+  "player_hp": 20,
+  "enemy_hp": 20,
+  "start_gold": 3,
+  "gold_per_turn": 1
+}

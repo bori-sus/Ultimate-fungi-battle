@@ -1,0 +1,5 @@
+rich
+textual
+pytest
+black
+flake8
