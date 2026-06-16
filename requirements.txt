@@ -1,5 +1,7 @@
-rich
-textual
-pytest
-black
-flake8
+textual>=0.40
+rich>=13.0
+pytest>=7.0
+pytest-asyncio>=0.21
+pytest-cov>=4.0
+black>=23.0
+flake8>=6.0

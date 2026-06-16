@@ -1,19 +1,25 @@
 [tool.poetry]
 name = "ultimate-fungi-battle"
 version = "0.1.0"
-description = "Карточная roguelike-игра в терминале — каркас проекта"
-authors = ["Автор <you@example.com>"]
+description = "Карточная roguelike-игра в терминале — грибной воин против сил Тьмы"
+authors = ["bori-sus <bori-sus@users.noreply.github.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9"
-rich = "^13.0.0"
-textual = "^0.22.0"
+textual = "^0.40.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
+pytest-asyncio = "^0.21.0"
+pytest-cov = "^4.0"
 black = "^23.0"
 flake8 = "^6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["src/tests"]
+pythonpath = ["src"]

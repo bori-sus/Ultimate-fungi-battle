@@ -2,6 +2,8 @@
 
 Тестируем BoardCell и HandCard — обрезание имён, превью стат, подсветку.
 """
+from unittest.mock import MagicMock
+
 from game.card import Card
 from ui.textual_app import BoardCell, HandCard
 
@@ -25,12 +27,14 @@ def _make_card(name="Мицелий", cost=1, atk=1, hp=2, effect_id=None, max_h
 
 
 def test_boardcell_truncates_long_name():
+    """Имя сохраняется полностью в _full_name и адаптивно обрезается в render()."""
     c = _make_card(name="А" * 50)
     cell = BoardCell(row=0, col=0)
     cell.set_card(c, "player", False)
-    # NAME_MAX = 13, последний символ — многоточие
-    assert len(cell.card_name) <= 13
-    assert cell.card_name.endswith("\u2026")
+    # _full_name — полное имя
+    assert cell._full_name == "А" * 50
+    # card_name тоже полное (обрезается в render)
+    assert cell.card_name == "А" * 50
 
 
 def test_boardcell_short_name_not_truncated():
@@ -38,26 +42,52 @@ def test_boardcell_short_name_not_truncated():
     cell = BoardCell(row=0, col=0)
     cell.set_card(c, "player", False)
     assert cell.card_name == "Мицелий"
+    assert cell._full_name == "Мицелий"
 
 
 def test_boardcell_exact_max_length_not_truncated():
-    """Имя ровно NAME_MAX символов — НЕ обрезается (без …)."""
+    """Имя ровно NAME_MAX символов — НЕ обрезается."""
     name = "А" * BoardCell.NAME_MAX
     c = _make_card(name=name)
     cell = BoardCell(row=0, col=0)
     cell.set_card(c, "player", False)
+    assert cell._full_name == name
     assert cell.card_name == name
-    assert "\u2026" not in cell.card_name
 
 
-def test_boardcell_one_over_truncated():
-    """Имя NAME_MAX+1 — обрезается до NAME_MAX-1 + …."""
-    name = "А" * (BoardCell.NAME_MAX + 1)
+def test_boardcell_render_adaptive_name_at_narrow_width():
+    """При узкой клетке имя обрезается в render()."""
+    name = "А" * 30
     c = _make_card(name=name)
     cell = BoardCell(row=0, col=0)
     cell.set_card(c, "player", False)
-    assert len(cell.card_name) == BoardCell.NAME_MAX
-    assert cell.card_name.endswith("\u2026")
+    # мокируем _size (внутреннее свойство Textual)
+    cell._size = MagicMock(width=10, height=3)
+    rendered = cell.render()
+    # в rendered имя должно быть обрезано до ~6 символов (10-4) с многоточием
+    # name_max = max(6, min(13, 10-4)) = max(6, 6) = 6
+    # 30 > 6, поэтому должно быть обрезано
+    assert "\u2026" in rendered
+
+
+def test_boardcell_render_adaptive_name_at_wide_width():
+    """При широкой клетке имя НЕ обрезается в render()."""
+    name = "А" * 20
+    c = _make_card(name=name)
+    cell = BoardCell(row=0, col=0)
+    cell.set_card(c, "player", False)
+    cell._size = MagicMock(width=40, height=3)
+    rendered = cell.render()
+    # name_max = max(6, min(13, 40-4)) = min(13, 36) = 13
+    # 20 > 13 — всё равно обрежется до 12+…
+    # но проверим, что 20 не помещается полностью
+    # 20 символов "А" не должны все влезти в строку имени (макс 13)
+    rendered_lines = rendered.split("\n")
+    name_line = rendered_lines[0]  # первая строка — имя
+    # очищаем от меток (▲⚡, ►, ▸, ◄, ◂)
+    name_only = name_line.lstrip("▸►▲▼⚡ ").rstrip("⚡►◂◄").strip()
+    # длина имени после очистки должна быть <= 13
+    assert len(name_only) <= 13
 
 
 # ─── BoardCell: статы и эффект ────────────────────────

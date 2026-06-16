@@ -52,7 +52,7 @@ def card_full(card: Card) -> str:
 class BoardCell(Widget):
     """Одна клетка поля 5×4 — перерисовывается через reactive."""
 
-    # ширина имени в клетке (в символах)
+    # ширина имени в клетке (в символах) — верхняя граница
     NAME_MAX = 13
     # префиксы эффектов (одна буква + код)
     EFFECT_SHORT = {
@@ -92,6 +92,7 @@ class BoardCell(Widget):
         self.row = row
         self.col = col
         self._card_obj: Optional[Card] = None
+        self._full_name: str = ""
 
     @staticmethod
     def _trunc(text: str, max_len: int) -> str:
@@ -154,7 +155,9 @@ class BoardCell(Widget):
     def set_card(self, card: Optional[Card], owner: str, prep: bool):
         self._card_obj = card
         if card:
-            self.card_name = self._trunc(card.name, self.NAME_MAX)
+            self._full_name = card.name
+            # card_name может быть обрезано в render() адаптивно
+            self.card_name = card.name
             self.card_stats = f"{card.atk}/{card.hp}"
             self.card_cost = f"c:{card.cost}"
             self.card_effect = self.EFFECT_SHORT.get(card.effect_id or "", "")
@@ -162,6 +165,7 @@ class BoardCell(Widget):
             self.prepared = prep
             self.has_card = True
         else:
+            self._full_name = ""
             self.card_name = ""
             self.card_stats = ""
             self.card_cost = ""
@@ -184,22 +188,30 @@ class BoardCell(Widget):
         self.highlight_invalid = False
 
     def render(self):
+        # адаптивная ширина имени: от размера клетки
+        w = self.size.width if self.size else 13
+        name_max = max(6, min(self.NAME_MAX, w - 4))  # минимум 6, максимум NAME_MAX
         if self.has_card:
             p_mark = "⚡" if self.prepared else " "
             side_arrow = "▼" if self.side == "enemy" else "▲"
-            # три строки: имя, ATK/HP, эффект/cost
             eff = self.card_effect
             cost = self.card_cost
+            # обрезаем имя под текущую ширину
+            full_name = self._full_name  # полное имя
+            if len(full_name) > name_max:
+                display_name = full_name[: name_max - 1] + "…"
+            else:
+                display_name = full_name
             line3 = (eff + " " + cost) if eff else ("     " + cost)
-            # центрируем имя в NAME_MAX
-            name_display = self.card_name.center(self.NAME_MAX)
+            name_display = display_name.center(name_max)
             text = (
                 f"{side_arrow}{name_display}{p_mark}\n"
                 f"  ATK:{self.card_stats:<6}\n"
                 f"{line3}"
             )
         else:
-            text = "[           ]\n\n"
+            empty = "[" + " " * (name_max + 2) + "]"
+            text = f"{empty}\n\n"
         if self.has_cursor:
             text = f"▸{text}◂"
         if self.highlight_target:
@@ -207,8 +219,11 @@ class BoardCell(Widget):
         return text
 
     def on_mount(self):
-        self.styles.width = 17
-        self.styles.height = 5
+        # Адаптивные размеры: растягиваемся по ячейке grid (1fr × 1fr)
+        self.styles.width = "1fr"
+        self.styles.height = "1fr"
+        self.styles.min_width = 12
+        self.styles.min_height = 3
         self.styles.background = "#0f3460"
         self.styles.border = ("solid", "#533483")
         self.styles.text_align = "center"
@@ -268,9 +283,12 @@ class HandCard(Widget):
         sel_prefix = "▸ " if sel else "  "
         c = self._card
         eff = self.EFFECT_SHORT.get(c.effect_id or "", "")
+        # адаптивная длина имени по ширине виджета
+        w = self.size.width if self.size else 22
+        name_max = max(8, min(self.NAME_MAX, w - 9))  # 9 = "[1] " + "ATK/HP c:N" минимум
         name = c.name
-        if len(name) > self.NAME_MAX:
-            name = name[: self.NAME_MAX - 1] + "…"
+        if len(name) > name_max:
+            name = name[: name_max - 1] + "…"
         eff_part = f" {eff}" if eff else ""
         self.label = (
             f"{sel_prefix}[{self.idx+1}] {name}\n"
@@ -285,8 +303,10 @@ class HandCard(Widget):
         return self.label
 
     def on_mount(self):
-        self.styles.width = 22
+        # Адаптивная ширина: растягиваемся в Horizontal-контейнере
+        self.styles.width = "1fr"
         self.styles.height = 3
+        self.styles.min_width = 16
         self.styles.background = "#0f3460"
         self.styles.border = ("solid", "#533483")
         self.styles.padding = (0, 0)
@@ -456,12 +476,21 @@ class FungiBattleApp(App):
         background: #1a1a2e;
         color: #e0e0e0;
     }
+    /* Контейнер всего приложения растягивается на весь экран */
+    #app-root {
+        width: 100%;
+        height: 100%;
+        layout: vertical;
+    }
+    /* Верхняя строка статусов: адаптивно */
     #top-bar {
         height: 1;
+        width: 100%;
         background: #16213e;
         padding: 0 1;
     }
     #top-bar Label {
+        width: auto;
         margin: 0 2 0 0;
     }
     #turn-label { color: #a0d6ff; }
@@ -469,50 +498,75 @@ class FungiBattleApp(App):
     #gold-label { color: #f0c040; }
     #enemy-hp-label { color: #ff6b6b; }
     #level-label { color: #4ecca3; }
+    /* Поле + инфо-панель: делим ширину */
     #main-area {
+        width: 100%;
         height: auto;
         padding: 0 1;
     }
+    /* Поле 5×4: адаптивные равные строки/колонки */
     #board-grid {
-        width: auto;
+        width: 4fr;
         height: auto;
+        min-height: 16;
         padding: 0;
         grid-size: 5 4;
-        grid-columns: 17;
-        grid-rows: 5;
+        grid-columns: 1fr;
+        grid-rows: 1fr;
+        grid-gutter: 0;
     }
+    #info-panel {
+        width: 1fr;
+        min-width: 20;
+        height: auto;
+    }
+    /* Рука: карточки растягиваются по ширине */
     #hand-area {
+        width: 100%;
         height: auto;
         background: #16213e;
         border: solid #533483;
         padding: 1;
         margin: 1 0;
+        layout: vertical;
     }
     #hand-area > Label {
+        width: auto;
         margin: 0 0 1 0;
+    }
+    #hand-cards {
+        width: 100%;
+        height: auto;
     }
     HandCard.selected {
         background: #533483;
         border: solid #e94560;
     }
+    /* Статус-бар */
     #status-bar {
         height: 1;
+        width: 100%;
         background: #16213e;
         padding: 0 1;
         color: #e0e0e0;
     }
+    /* Touch-панель с кнопками */
     #touch-panel {
+        width: 100%;
         height: auto;
         background: #16213e;
         border: solid #533483;
         padding: 0 1;
         margin: 0 0 1 0;
+        layout: vertical;
     }
     #touch-panel-row1, #touch-panel-row2, #touch-panel-row3 {
+        width: 100%;
         height: auto;
         align: center middle;
     }
     .touch-btn {
+        width: 1fr;
         min-width: 5;
         height: 3;
         margin: 0 1 0 0;
@@ -520,6 +574,7 @@ class FungiBattleApp(App):
         border: solid #533483;
         color: #e0e0e0;
         text-style: bold;
+        content-align: center middle;
     }
     .touch-btn:hover {
         background: #533483;
@@ -543,6 +598,13 @@ class FungiBattleApp(App):
     .touch-spacer {
         width: 1;
     }
+    /* Адаптация для маленьких экранов: < 80 столбцов */
+    Screen.-narrow .info-card-extra { display: none; }
+    Screen.-narrow #info-panel { display: none; }
+    Screen.-narrow #board-grid { width: 100%; }
+    /* Адаптация для очень маленьких экранов: < 50 столбцов */
+    Screen.-tiny #top-bar Label { margin: 0 1 0 0; }
+    Screen.-tiny .touch-btn { height: 2; }
     """
 
     BINDINGS = [
@@ -598,6 +660,8 @@ class FungiBattleApp(App):
             yield InfoPanel(id="info-panel")
         with Vertical(id="hand-area"):
             yield Label("Рука:")
+            with Horizontal(id="hand-cards"):
+                yield Static("", id="hand-placeholder")
         with Vertical(id="touch-panel"):
             with Horizontal(id="touch-panel-row1"):
                 for i in range(1, 5):
@@ -626,6 +690,36 @@ class FungiBattleApp(App):
                 grid.mount(BoardCell(r, c))
         self._start_player_turn()
         self._refresh_all()
+        # инициализировать адаптивные классы экрана
+        self._update_responsive_classes()
+
+    def on_resize(self, event) -> None:
+        """При изменении размера экрана — обновить адаптивные классы и перерисовать."""
+        self._update_responsive_classes()
+        # перерисовать клетки, чтобы имена адаптировались под новую ширину
+        for w in self.query(BoardCell):
+            w.refresh()
+        for w in self.query(HandCard):
+            w._build_label(w.selected)
+            w.refresh()
+
+    def _update_responsive_classes(self) -> None:
+        """Установить CSS-классы экрана по текущему размеру.
+
+        - width < 50: -tiny и -narrow
+        - 50 <= width < 80: -narrow
+        - width >= 80: без адаптивных классов
+        """
+        try:
+            size = self.size
+        except Exception:
+            return
+        w = size.width
+        screen = self.screen
+        is_tiny = w < 50
+        is_narrow = w < 80
+        screen.set_class(is_tiny, "-tiny")
+        screen.set_class(is_narrow, "-narrow")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Тап/клик по кнопке в touch-панели — эмуляция нажатия клавиши."""
@@ -722,17 +816,24 @@ class FungiBattleApp(App):
             cw.set_card(cell_data.card, cell_data.owner or "", cell_data.prepared)
 
     def _refresh_hand(self):
+        # карты монтируются в Horizontal #hand-cards, чтобы занимали всю ширину
         ha = self.query_one("#hand-area", Vertical)
-        for w in list(ha.children):
+        container = self.query_one("#hand-cards", Horizontal)
+        # удаляем старые HandCard
+        for w in list(container.children):
             if isinstance(w, HandCard):
                 w.remove()
+        # удаляем заглушку, если она есть
+        placeholder = self.query_one("#hand-placeholder", Static)
+        if placeholder and placeholder in container.children:
+            placeholder.remove()
         hand = self.engine.state.player.hand
         for i, card in enumerate(hand):
             sel = (self.selected_hand_idx == i)
             hc = HandCard(card, i, sel=sel)
             if sel:
                 hc.set_class(True, "selected")
-            ha.mount(hc)
+            container.mount(hc)
 
     def _refresh_info(self):
         board = self.engine.state.board
