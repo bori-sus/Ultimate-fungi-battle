@@ -52,6 +52,26 @@ def card_full(card: Card) -> str:
 class BoardCell(Widget):
     """Одна клетка поля 5×4 — перерисовывается через reactive."""
 
+    DEFAULT_CSS = """
+    BoardCell {
+        width: 1fr;
+        height: 1fr;
+        min-width: 10;
+        min-height: 3;
+        background: #0f3460;
+        border: solid #533483;
+        text-align: center;
+        padding: 0;
+        margin: 0;
+    }
+    /* На Termux и узких экранах — убираем border и сжимаем */
+    Screen.-tiny BoardCell {
+        min-width: 5;
+        min-height: 1;
+        border: none;
+    }
+    """
+
     # ширина имени в клетке (в символах) — верхняя граница
     NAME_MAX = 13
     # префиксы эффектов (одна буква + код)
@@ -219,13 +239,25 @@ class BoardCell(Widget):
         return text
 
     def on_mount(self):
-        # Адаптивные размеры: растягиваемся по ячейке grid (1fr × 1fr)
-        self.styles.width = "1fr"
-        self.styles.height = "1fr"
-        self.styles.min_width = 12
-        self.styles.min_height = 3
+        # Адаптивные размеры по ширине экрана (фиксированные, надежные)
+        w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
+        if w >= 120:
+            cw, ch = 22, 7
+        elif w >= 90:
+            cw, ch = 16, 5
+        elif w >= 70:
+            cw, ch = 12, 4
+        elif w >= 50:
+            cw, ch = 9, 3
+        else:
+            cw, ch = 6, 3
+        self.styles.width = cw
+        self.styles.height = ch
+        self.styles.min_width = cw
+        self.styles.min_height = ch
         self.styles.background = "#0f3460"
-        self.styles.border = ("solid", "#533483")
+        # Border убираем полностью — экономит место (2 строки)
+        self.styles.border = ("none", "transparent")
         self.styles.text_align = "center"
         self.styles.padding = (0, 0)
         self.styles.margin = (0, 0, 0, 0)
@@ -258,6 +290,23 @@ class BoardCell(Widget):
 
 class HandCard(Widget):
     """Карта в руке — тоже через reactive."""
+
+    DEFAULT_CSS = """
+    HandCard {
+        width: 1fr;
+        height: 3;
+        min-width: 12;
+        background: #0f3460;
+        border: solid #533483;
+        padding: 0;
+        margin: 0 1 0 0;
+        box-sizing: border-box;
+    }
+    Screen.-tiny HandCard {
+        min-width: 8;
+        min-height: 2;
+    }
+    """
 
     label: reactive[str] = reactive("")
     selected: reactive[bool] = reactive(False)
@@ -303,12 +352,25 @@ class HandCard(Widget):
         return self.label
 
     def on_mount(self):
-        # Адаптивная ширина: растягиваемся в Horizontal-контейнере
-        self.styles.width = "1fr"
-        self.styles.height = 3
-        self.styles.min_width = 16
+        # Адаптивные размеры по ширине экрана
+        w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
+        if w >= 120:
+            cw, ch = 28, 3
+        elif w >= 90:
+            cw, ch = 20, 3
+        elif w >= 70:
+            cw, ch = 15, 3
+        elif w >= 50:
+            cw, ch = 11, 3
+        else:
+            cw, ch = 8, 3
+        self.styles.width = cw
+        self.styles.height = ch
+        self.styles.min_width = cw
+        self.styles.min_height = ch
         self.styles.background = "#0f3460"
-        self.styles.border = ("solid", "#533483")
+        # Border убираем — экономим место
+        self.styles.border = ("none", "transparent")
         self.styles.padding = (0, 0)
         self.styles.margin = (0, 1, 0, 0)
 
@@ -501,18 +563,19 @@ class FungiBattleApp(App):
     /* Поле + инфо-панель: делим ширину */
     #main-area {
         width: 100%;
-        height: auto;
+        height: 1fr;
+        min-height: 8;
         padding: 0 1;
     }
-    /* Поле 5×4: адаптивные равные строки/колонки */
+    /* Поле 5×4: адаптивные размеры (фиксированные по ширине экрана) */
     #board-grid {
-        width: 4fr;
-        height: auto;
-        min-height: 16;
+        width: 100%;
+        height: 1fr;
+        min-height: 8;
         padding: 0;
         grid-size: 5 4;
-        grid-columns: 1fr;
-        grid-rows: 1fr;
+        grid-columns: auto;
+        grid-rows: auto;
         grid-gutter: 0;
     }
     #info-panel {
@@ -525,14 +588,15 @@ class FungiBattleApp(App):
         width: 100%;
         height: auto;
         background: #16213e;
-        border: solid #533483;
-        padding: 1;
-        margin: 1 0;
         layout: vertical;
+        padding: 0;
+        margin: 0;
+        border: none;
     }
     #hand-area > Label {
         width: auto;
-        margin: 0 0 1 0;
+        margin: 0;
+        height: 1;
     }
     #hand-cards {
         width: 100%;
@@ -555,9 +619,8 @@ class FungiBattleApp(App):
         width: 100%;
         height: auto;
         background: #16213e;
-        border: solid #533483;
-        padding: 0 1;
-        margin: 0 0 1 0;
+        padding: 0;
+        margin: 0;
         layout: vertical;
     }
     #touch-panel-row1, #touch-panel-row2, #touch-panel-row3 {
@@ -567,11 +630,11 @@ class FungiBattleApp(App):
     }
     .touch-btn {
         width: 1fr;
-        min-width: 5;
-        height: 3;
-        margin: 0 1 0 0;
+        min-width: 3;
+        height: 1;
+        margin: 0;
         background: #0f3460;
-        border: solid #533483;
+        border: none;
         color: #e0e0e0;
         text-style: bold;
         content-align: center middle;
@@ -602,9 +665,45 @@ class FungiBattleApp(App):
     Screen.-narrow .info-card-extra { display: none; }
     Screen.-narrow #info-panel { display: none; }
     Screen.-narrow #board-grid { width: 100%; }
-    /* Адаптация для очень маленьких экранов: < 50 столбцов */
-    Screen.-tiny #top-bar Label { margin: 0 1 0 0; }
-    Screen.-tiny .touch-btn { height: 2; }
+    Screen.-narrow #hand-area {
+        padding: 0;
+        margin: 0;
+        border: none;
+    }
+    Screen.-narrow #touch-panel {
+        height: auto;
+    }
+    Screen.-narrow .touch-btn { height: 2; }
+    /* Адаптация для очень маленьких экранов: < 50 столбцов (Termux портрет) */
+    Screen.-tiny {
+        layout: vertical;
+    }
+    Screen.-tiny #top-bar {
+        height: 1;
+        padding: 0;
+    }
+    Screen.-tiny #top-bar Label { margin: 0 0 0 1; }
+    Screen.-tiny #main-area {
+        height: 1fr;
+        padding: 0;
+    }
+    Screen.-tiny #board-grid {
+        width: 100%;
+        height: 1fr;
+        min-height: 8;
+    }
+    Screen.-tiny #status-bar { display: none; }
+    Screen.-tiny #hand-area {
+        height: auto;
+        padding: 0;
+        margin: 0;
+        border: none;
+        background: #1a1a2e;
+    }
+    Screen.-tiny #hand-area > Label { display: none; }
+    Screen.-tiny #hand-cards { height: 3; }
+    Screen.-tiny HandCard { height: 3; }
+    Screen.-tiny #touch-panel { display: none; }
     """
 
     BINDINGS = [
@@ -661,7 +760,7 @@ class FungiBattleApp(App):
         with Vertical(id="hand-area"):
             yield Label("Рука:")
             with Horizontal(id="hand-cards"):
-                yield Static("", id="hand-placeholder")
+                pass  # HandCard монтируются в _refresh_hand
         with Vertical(id="touch-panel"):
             with Horizontal(id="touch-panel-row1"):
                 for i in range(1, 5):
@@ -824,9 +923,12 @@ class FungiBattleApp(App):
             if isinstance(w, HandCard):
                 w.remove()
         # удаляем заглушку, если она есть
-        placeholder = self.query_one("#hand-placeholder", Static)
-        if placeholder and placeholder in container.children:
-            placeholder.remove()
+        try:
+            placeholder = self.query_one("#hand-placeholder", Static)
+            if placeholder and placeholder in container.children:
+                placeholder.remove()
+        except Exception:
+            pass  # placeholder уже удалён
         hand = self.engine.state.player.hand
         for i, card in enumerate(hand):
             sel = (self.selected_hand_idx == i)
