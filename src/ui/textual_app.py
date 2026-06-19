@@ -242,15 +242,15 @@ class BoardCell(Widget):
         # Адаптивные размеры по ширине экрана (фиксированные, надежные)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
         if w >= 120:
-            cw, ch = 22, 7
+            cw, ch = 24, 6
         elif w >= 90:
-            cw, ch = 16, 5
+            cw, ch = 18, 5
         elif w >= 70:
-            cw, ch = 12, 4
+            cw, ch = 14, 4
         elif w >= 50:
-            cw, ch = 9, 3
+            cw, ch = 10, 4
         else:
-            cw, ch = 6, 3
+            cw, ch = 7, 4
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -289,33 +289,16 @@ class BoardCell(Widget):
 
 
 class HandCard(Widget):
-    """Карта в руке — тоже через reactive."""
-
-    DEFAULT_CSS = """
-    HandCard {
-        width: 1fr;
-        height: 3;
-        min-width: 12;
-        background: #0f3460;
-        border: solid #533483;
-        padding: 0;
-        margin: 0 1 0 0;
-        box-sizing: border-box;
-    }
-    Screen.-tiny HandCard {
-        min-width: 8;
-        min-height: 2;
-    }
-    """
+    """Карта в руке — полноразмерная (4-5 строк: имя, ATK/HP, эффект, описание)."""
 
     label: reactive[str] = reactive("")
     selected: reactive[bool] = reactive(False)
 
-    # Превью карты при наведении/выборе показывает 3 строки
-    # (имя, статы, эффект/cost). Длинные имена обрезаются.
-
     EFFECT_SHORT = BoardCell.EFFECT_SHORT
     NAME_MAX = 14
+    # полное описание показывается только если хватает места
+    DESCRIPTION_MIN_WIDTH = 18  # минимальная ширина для показа описания
+    DESCRIPTION_MIN_HEIGHT = 4  # минимальная высота для показа описания
 
     def __init__(self, card: Card, idx: int, sel: bool = False, **kw):
         super().__init__(**kw)
@@ -329,20 +312,41 @@ class HandCard(Widget):
             self.set_class(True, "selected")
 
     def _build_label(self, sel: bool):
+        """Собрать полное превью карты.
+
+        Полноразмерный формат (4-5 строк):
+        ▸ [1] Имя
+            2/3  c:2  PSN
+            Ядовитая атака +1
+        """
         sel_prefix = "▸ " if sel else "  "
         c = self._card
         eff = self.EFFECT_SHORT.get(c.effect_id or "", "")
-        # адаптивная длина имени по ширине виджета
         w = self.size.width if self.size else 22
-        name_max = max(8, min(self.NAME_MAX, w - 9))  # 9 = "[1] " + "ATK/HP c:N" минимум
+        h = self.size.height if self.size else 4
+        # длина имени (адаптивно)
+        name_max = max(6, min(self.NAME_MAX, w - 6))  # 6 = "[1] " + отступ
         name = c.name
         if len(name) > name_max:
             name = name[: name_max - 1] + "…"
         eff_part = f" {eff}" if eff else ""
-        self.label = (
-            f"{sel_prefix}[{self.idx+1}] {name}\n"
-            f"    {c.atk}/{c.hp}  c:{c.cost}{eff_part}"
-        )
+        # первая строка: [N] Имя
+        line1 = f"{sel_prefix}[{self.idx+1}] {name}"
+        # вторая строка: ATK/HP  c:cost  EFFECT
+        line2 = f"    {c.atk}/{c.hp}  c:{c.cost}{eff_part}"
+        lines = [line1, line2]
+        # описание показываем если хватает места
+        if h >= 4 and c.description:
+            desc_max = max(8, w - 4)
+            desc = c.description
+            if len(desc) > desc_max:
+                desc = desc[: desc_max - 1] + "…"
+            lines.append(f"    {desc}")
+        self.label = "\n".join(lines)
+
+    def watch_selected(self, val: bool):
+        self._build_label(val)
+        self.set_class(val, "selected")
 
     def watch_selected(self, val: bool):
         self._build_label(val)
@@ -352,18 +356,18 @@ class HandCard(Widget):
         return self.label
 
     def on_mount(self):
-        # Адаптивные размеры по ширине экрана
+        # Адаптивные размеры по ширине экрана (полноразмерные карты с описанием)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
         if w >= 120:
-            cw, ch = 28, 3
+            cw, ch = 30, 5
         elif w >= 90:
-            cw, ch = 20, 3
+            cw, ch = 22, 5
         elif w >= 70:
-            cw, ch = 15, 3
+            cw, ch = 17, 4
         elif w >= 50:
-            cw, ch = 11, 3
+            cw, ch = 12, 4
         else:
-            cw, ch = 8, 3
+            cw, ch = 9, 3
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -373,6 +377,12 @@ class HandCard(Widget):
         self.styles.border = ("none", "transparent")
         self.styles.padding = (0, 0)
         self.styles.margin = (0, 1, 0, 0)
+        # Пересобираем label после первого layout (когда size станет известен)
+        self.call_after_refresh(lambda: self._build_label(self.selected))
+
+    def on_size(self) -> None:
+        """При изменении размера пересобираем label адаптивно."""
+        self._build_label(self.selected)
 
     def on_click(self, event) -> None:
         """Тап/клик по карте в руке — выбрать её для размещения."""
