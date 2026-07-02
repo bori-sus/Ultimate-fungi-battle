@@ -231,9 +231,10 @@ class BoardCell(Widget):
         return text
 
     def on_mount(self):
-        # Адаптивные размеры по ширине экрана (фиксированные, надежные)
+        # Адаптивные размеры по ширине И высоте экрана (соотношение игральной карты)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
-        cw, ch = self._card_size_for(w)
+        h = self.app.size.height if self.app and hasattr(self.app, "size") else 24
+        cw, ch = self._card_size_for(w, h)
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -246,26 +247,26 @@ class BoardCell(Widget):
         self.styles.margin = (0, 0, 0, 0)
 
     @staticmethod
-    def _card_size_for(width: int) -> tuple[int, int]:
+    def _card_size_for(width: int, height: int = 0) -> tuple[int, int]:
         """Единый расчёт размера клетки/карты: cell_width x cell_height.
 
-        Примеры:
-            40:  7×4
-            60:  10×4
-            80:  14×4
-            100: 18×5
-            120: 24×6
+        Соотношение сторон как у стандартной игральной карты:
+            Poker card:  2.5" × 3.5"  (0.71)
+            Magic card:  63 × 88 мм   (0.72)
+        Логика: адаптируем по ширине И высоте, чтобы карты влезали.
+            3×4   (0.75) — Termux портрет 40×20, узкий экран
+            4×5   (0.80) — средний экран 60×30
+            5×7   (0.71) — стандарт игральной карты (Magic/Poker)
         """
-        if width >= 120:
-            return 24, 6
-        elif width >= 90:
-            return 18, 5
-        elif width >= 70:
-            return 14, 4
-        elif width >= 50:
-            return 10, 4
+        # Маленькие экраны (узкие или с маленькой высотой)
+        if width < 50 or (width < 90 and height > 0 and height < 30):
+            return 3, 4
+        # Большие экраны — стандарт игральной карты 5:7
+        elif width >= 90 and (height == 0 or height >= 30):
+            return 5, 7
+        # Средние экраны
         else:
-            return 7, 4
+            return 4, 5
 
     def on_click(self, event) -> None:
         """Тап/клик по клетке — выбрать её как целевую или поставить карту.
@@ -317,9 +318,9 @@ class HandCard(Widget):
             self.set_class(True, "selected")
 
     def _build_label(self, sel: bool):
-        """Собрать полное превью карты.
+        """Собрать полное превью карты с центрированием.
 
-        Полноразмерный формат (4-5 строк):
+        Полноразмерный формат (центрируется в карте):
         ▸ [1] Имя
             2/3  c:2  PSN
             Ядовитая атака +1
@@ -347,6 +348,12 @@ class HandCard(Widget):
             if len(desc) > desc_max:
                 desc = desc[: desc_max - 1] + "…"
             lines.append(f"    {desc}")
+        # Центрируем: добавляем пустые строки сверху/снизу
+        if h > len(lines):
+            total_pad = h - len(lines)
+            top_pad = total_pad // 2
+            bot_pad = total_pad - top_pad
+            lines = [""] * top_pad + lines + [""] * bot_pad
         self.label = "\n".join(lines)
 
     def watch_selected(self, val: bool):
@@ -363,8 +370,9 @@ class HandCard(Widget):
     def on_mount(self):
         # Адаптивные размеры (те же что у BoardCell — карта = размер клетки)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
+        h = self.app.size.height if self.app and hasattr(self.app, "size") else 24
         from ui.textual_app import BoardCell
-        cw, ch = BoardCell._card_size_for(w)
+        cw, ch = BoardCell._card_size_for(w, h)
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -633,6 +641,9 @@ class FungiBattleApp(App):
         padding: 0;
         margin: 0;
         layout: vertical;
+    }
+    #touch-panel Horizontal {
+        height: 1;
     }
     #touch-panel-row1, #touch-panel-row2, #touch-panel-row3 {
         width: 100%;
