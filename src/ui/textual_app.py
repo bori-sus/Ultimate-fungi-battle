@@ -56,19 +56,11 @@ class BoardCell(Widget):
     BoardCell {
         width: 1fr;
         height: 1fr;
-        min-width: 10;
-        min-height: 3;
         background: #0f3460;
         border: solid #533483;
         text-align: center;
         padding: 0;
         margin: 0;
-    }
-    /* На Termux и узких экранах — убираем border и сжимаем */
-    Screen.-tiny BoardCell {
-        min-width: 5;
-        min-height: 1;
-        border: none;
     }
     """
 
@@ -241,16 +233,7 @@ class BoardCell(Widget):
     def on_mount(self):
         # Адаптивные размеры по ширине экрана (фиксированные, надежные)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
-        if w >= 120:
-            cw, ch = 24, 6
-        elif w >= 90:
-            cw, ch = 18, 5
-        elif w >= 70:
-            cw, ch = 14, 4
-        elif w >= 50:
-            cw, ch = 10, 4
-        else:
-            cw, ch = 7, 4
+        cw, ch = self._card_size_for(w)
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -261,6 +244,28 @@ class BoardCell(Widget):
         self.styles.text_align = "center"
         self.styles.padding = (0, 0)
         self.styles.margin = (0, 0, 0, 0)
+
+    @staticmethod
+    def _card_size_for(width: int) -> tuple[int, int]:
+        """Единый расчёт размера клетки/карты: cell_width x cell_height.
+
+        Примеры:
+            40:  7×3
+            60:  10×4
+            80:  14×4
+            100: 18×5
+            120: 24×6
+        """
+        if width >= 120:
+            return 24, 6
+        elif width >= 90:
+            return 18, 5
+        elif width >= 70:
+            return 14, 4
+        elif width >= 50:
+            return 10, 4
+        else:
+            return 7, 3
 
     def on_click(self, event) -> None:
         """Тап/клик по клетке — выбрать её как целевую или поставить карту.
@@ -356,18 +361,10 @@ class HandCard(Widget):
         return self.label
 
     def on_mount(self):
-        # Адаптивные размеры по ширине экрана (полноразмерные карты с описанием)
+        # Адаптивные размеры (те же что у BoardCell — карта = размер клетки)
         w = self.app.size.width if self.app and hasattr(self.app, "size") else 80
-        if w >= 120:
-            cw, ch = 30, 5
-        elif w >= 90:
-            cw, ch = 22, 5
-        elif w >= 70:
-            cw, ch = 17, 4
-        elif w >= 50:
-            cw, ch = 12, 4
-        else:
-            cw, ch = 9, 3
+        from ui.textual_app import BoardCell
+        cw, ch = BoardCell._card_size_for(w)
         self.styles.width = cw
         self.styles.height = ch
         self.styles.min_width = cw
@@ -376,7 +373,7 @@ class HandCard(Widget):
         # Border убираем — экономим место
         self.styles.border = ("none", "transparent")
         self.styles.padding = (0, 0)
-        self.styles.margin = (0, 1, 0, 0)
+        self.styles.margin = (0, 0, 0, 0)
         # Пересобираем label после первого layout (когда size станет известен)
         self.call_after_refresh(lambda: self._build_label(self.selected))
 
@@ -573,19 +570,17 @@ class FungiBattleApp(App):
     /* Поле + инфо-панель: делим ширину */
     #main-area {
         width: 100%;
-        height: 1fr;
-        min-height: 8;
-        padding: 0 1;
+        height: auto;
+        padding: 0;
+        margin: 0;
     }
     /* Поле 5×4: адаптивные размеры (фиксированные по ширине экрана) */
     #board-grid {
         width: 100%;
-        height: 1fr;
-        min-height: 8;
+        height: auto;
         padding: 0;
+        margin: 0;
         grid-size: 5 4;
-        grid-columns: auto;
-        grid-rows: auto;
         grid-gutter: 0;
     }
     #info-panel {
@@ -607,10 +602,13 @@ class FungiBattleApp(App):
         width: auto;
         margin: 0;
         height: 1;
+        display: none;  /* скрыт — top-bar уже показывает HP/gold/turn */
     }
     #hand-cards {
         width: 100%;
         height: auto;
+        padding: 0;
+        margin: 0;
     }
     HandCard.selected {
         background: #533483;
@@ -623,6 +621,7 @@ class FungiBattleApp(App):
         background: #16213e;
         padding: 0 1;
         color: #e0e0e0;
+        display: none;  /* скрыт по умолчанию — top-bar показывает HP/gold */
     }
     /* Touch-панель с кнопками */
     #touch-panel {
@@ -683,7 +682,9 @@ class FungiBattleApp(App):
     Screen.-narrow #touch-panel {
         height: auto;
     }
-    Screen.-narrow .touch-btn { height: 2; }
+    Screen.-narrow .touch-btn { height: 1; }
+    /* Стандартный режим (>=80) — touch-панель компактнее */
+    Screen.-narrow #hand-area > Label { display: none; }
     /* Адаптация для очень маленьких экранов: < 50 столбцов (Termux портрет) */
     Screen.-tiny {
         layout: vertical;
@@ -694,13 +695,12 @@ class FungiBattleApp(App):
     }
     Screen.-tiny #top-bar Label { margin: 0 0 0 1; }
     Screen.-tiny #main-area {
-        height: 1fr;
+        height: auto;
         padding: 0;
     }
     Screen.-tiny #board-grid {
         width: 100%;
-        height: 1fr;
-        min-height: 8;
+        height: auto;
     }
     Screen.-tiny #status-bar { display: none; }
     Screen.-tiny #hand-area {
@@ -775,17 +775,16 @@ class FungiBattleApp(App):
             with Horizontal(id="touch-panel-row1"):
                 for i in range(1, 5):
                     yield Button(f"[{i}]", id=f"t-card-{i}", classes="touch-btn")
-            with Horizontal(id="touch-panel-row2"):
                 for letter in "abcde":
                     yield Button(letter.upper(), id=f"t-col-{letter}", classes="touch-btn")
-            with Horizontal(id="touch-panel-row3"):
                 yield Button("␣\nПоставить", id="t-play", classes="touch-btn primary")
                 yield Button("$ Продать", id="t-sell", classes="touch-btn")
-                yield Button("✓ Пропуск", id="t-pass", classes="touch-btn")
+            with Horizontal(id="touch-panel-row2"):
                 yield Button("←", id="t-left", classes="touch-btn")
                 yield Button("↑", id="t-up", classes="touch-btn")
                 yield Button("↓", id="t-down", classes="touch-btn")
                 yield Button("→", id="t-right", classes="touch-btn")
+                yield Button("✓ Пропуск", id="t-pass", classes="touch-btn")
         yield Static("Добро пожаловать! 1-4 выбрать карту, a-e колонна, s продать, p пропуск", id="status-bar")
         yield Footer()
 

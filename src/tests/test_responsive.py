@@ -26,10 +26,10 @@ def test_css_has_responsive_classes():
 
 
 def test_css_has_responsive_grid():
-    """CSS содержит адаптивные grid-rows и grid-columns (auto)."""
+    """CSS содержит адаптивный grid (grid-size + grid-gutter: 0)."""
     css = FungiBattleApp.CSS
-    assert "grid-rows:" in css
-    assert "grid-columns:" in css
+    assert "grid-size:" in css
+    assert "grid-gutter: 0" in css
 
 
 def test_css_has_responsive_hand_area():
