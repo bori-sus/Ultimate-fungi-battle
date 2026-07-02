@@ -250,7 +250,7 @@ class BoardCell(Widget):
         """Единый расчёт размера клетки/карты: cell_width x cell_height.
 
         Примеры:
-            40:  7×3
+            40:  7×4
             60:  10×4
             80:  14×4
             100: 18×5
@@ -265,7 +265,7 @@ class BoardCell(Widget):
         elif width >= 50:
             return 10, 4
         else:
-            return 7, 3
+            return 7, 4
 
     def on_click(self, event) -> None:
         """Тап/клик по клетке — выбрать её как целевую или поставить карту.
@@ -545,6 +545,8 @@ class FungiBattleApp(App):
         background: #1a1a2e;
         color: #e0e0e0;
     }
+    Header { display: none; }
+    Footer { display: none; }
     /* Контейнер всего приложения растягивается на весь экран */
     #app-root {
         width: 100%;
@@ -684,14 +686,14 @@ class FungiBattleApp(App):
     }
     Screen.-narrow .touch-btn { height: 1; }
     /* Стандартный режим (>=80) — touch-панель компактнее */
-    Screen.-narrow #hand-area > Label { display: none; }
     /* Адаптация для очень маленьких экранов: < 50 столбцов (Termux портрет) */
     Screen.-tiny {
         layout: vertical;
     }
     Screen.-tiny #top-bar {
-        height: 1;
+        height: 0;
         padding: 0;
+        display: none;  /* освобождаем строку под клетки/руку */
     }
     Screen.-tiny #top-bar Label { margin: 0 0 0 1; }
     Screen.-tiny #main-area {
@@ -767,10 +769,6 @@ class FungiBattleApp(App):
         with Horizontal(id="main-area"):
             yield Grid(id="board-grid")
             yield InfoPanel(id="info-panel")
-        with Vertical(id="hand-area"):
-            yield Label("Рука:")
-            with Horizontal(id="hand-cards"):
-                pass  # HandCard монтируются в _refresh_hand
         with Vertical(id="touch-panel"):
             with Horizontal(id="touch-panel-row1"):
                 for i in range(1, 5):
@@ -785,6 +783,10 @@ class FungiBattleApp(App):
                 yield Button("↓", id="t-down", classes="touch-btn")
                 yield Button("→", id="t-right", classes="touch-btn")
                 yield Button("✓ Пропуск", id="t-pass", classes="touch-btn")
+        with Vertical(id="hand-area"):
+            yield Label("Рука:")
+            with Horizontal(id="hand-cards"):
+                pass  # HandCard монтируются в _refresh_hand
         yield Static("Добро пожаловать! 1-4 выбрать карту, a-e колонна, s продать, p пропуск", id="status-bar")
         yield Footer()
 
